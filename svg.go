@@ -291,6 +291,10 @@ func writePRRow(b *bytes.Buffer, pr PR, cols []col, rowIdx, y, tableX int, t the
 		switch c.key {
 		case "status":
 			writeIcon(b, pr.Status, x+c.width/2-7, y+rowH/2-7)
+		case "stars":
+			tx := alignX(x, c.width, "right")
+			fmt.Fprintf(b, `<text x="%d" y="%d" fill="%s" text-anchor="end">%s</text>`,
+				tx, cy, t.textColor, html.EscapeString(prCell(pr, c.key)))
 		case "pr_title":
 			clip := fmt.Sprintf("c%d%s", rowIdx, c.key)
 			fmt.Fprintf(b, `<clipPath id="%s"><rect x="%d" y="%d" width="%d" height="%d"/></clipPath>`, clip, x, y, c.width-pad, rowH)
@@ -329,7 +333,11 @@ func writeRepoRow(b *bytes.Buffer, repo RepoAggregate, cols []col, rowIdx, y, ta
 		}
 		text := repoCell(repo, c.key)
 
-		if c.key == "repo" || c.key == "pr_numbers" {
+		if c.key == "stars" {
+			tx := alignX(x, c.width, "right")
+			fmt.Fprintf(b, `<text x="%d" y="%d" fill="%s" text-anchor="end">%s</text>`,
+				tx, cy, color, html.EscapeString(text))
+		} else if c.key == "repo" || c.key == "pr_numbers" {
 			clip := fmt.Sprintf("rc%d%s", rowIdx, c.key)
 			fmt.Fprintf(b, `<clipPath id="%s"><rect x="%d" y="%d" width="%d" height="%d"/></clipPath>`, clip, x, y, c.width-pad, rowH)
 			fmt.Fprintf(b, `<text x="%d" y="%d" fill="%s" clip-path="url(#%s)">%s</text>`,

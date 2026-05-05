@@ -21,7 +21,7 @@ type cacheEntry struct {
 
 var (
 	svgCache sync.Map
-	cacheTTL = 5 * time.Minute
+	cacheTTL = 1 * time.Hour
 )
 
 func main() {
@@ -68,7 +68,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		entry := v.(cacheEntry)
 		if time.Since(entry.at) < cacheTTL {
 			w.Header().Set("Content-Type", "image/svg+xml")
-			w.Header().Set("Cache-Control", "public, max-age=300")
+			w.Header().Set("Cache-Control", "public, max-age=3600")
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			fmt.Fprint(w, entry.svg)
 			return
@@ -87,7 +87,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	svgCache.Store(cacheKey, cacheEntry{svg: svg, at: time.Now()})
 
 	w.Header().Set("Content-Type", "image/svg+xml")
-	w.Header().Set("Cache-Control", "public, max-age=300")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	fmt.Fprint(w, svg)
 }

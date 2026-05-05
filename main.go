@@ -8,8 +8,20 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/joho/godotenv"
+)
+
+type cacheEntry struct {
+	svg string
+	at  time.Time
+}
+
+var (
+	svgCache sync.Map
+	cacheTTL = 5 * time.Minute
 )
 
 func main() {
@@ -51,6 +63,18 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		Mode:     q.Get("mode"),
 	}
 
+	cacheKey := r.URL.RawQuery
+	if v, ok := svgCache.Load(cacheKey); ok {
+		entry := v.(cacheEntry)
+		if time.Since(entry.at) < cacheTTL {
+			w.Header().Set("Content-Type", "image/svg+xml")
+			w.Header().Set("Cache-Control", "public, max-age=300")
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			fmt.Fprint(w, entry.svg)
+			return
+		}
+	}
+
 	raw, err := fetchAllPRs(token, username)
 	if err != nil {
 		svgError(w, err.Error(), strings.Contains(err.Error(), "not found"))
@@ -60,8 +84,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	prs, stats, repos := processData(raw, params)
 	svg := generateSVG(username, prs, stats, params, repos)
 
+	svgCache.Store(cacheKey, cacheEntry{svg: svg, at: time.Now()})
+
 	w.Header().Set("Content-Type", "image/svg+xml")
-	w.Header().Set("Cache-Control", "no-cache, must-revalidate")
+	w.Header().Set("Cache-Control", "public, max-age=300")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	fmt.Fprint(w, svg)
 }

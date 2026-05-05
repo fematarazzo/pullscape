@@ -2,12 +2,12 @@
 
 Generates SVG cards showing a GitHub user's pull request history. Embed them in a profile README or anywhere that renders images.
 
-## How it works
+**Live:** https://pullscape.fly.dev
 
-One endpoint fetches all PRs for a given user via the GitHub GraphQL API, processes them, and returns an SVG table. No database, no caching layer.
+## Usage
 
 ```
-GET /api/github-pr-stats?username=<github_username>
+GET https://pullscape.fly.dev/api/github-pr-stats?username=<github_username>
 ```
 
 ## Parameters
@@ -43,10 +43,16 @@ Repo aggregate: `repo`, `stars`, `pr_numbers`, `total`, `merged`, `open`, `draft
 ## Examples
 
 ```
-/api/github-pr-stats?username=torvalds&theme=light&limit=5
-/api/github-pr-stats?username=torvalds&status=merged&sort=stars_desc&limit=10
-/api/github-pr-stats?username=torvalds&mode=repo-aggregate&sort=merged_rate_desc
-/api/github-pr-stats?username=torvalds&fields=repo,stars,status&stats=total_pr,merged_pr
+https://pullscape.fly.dev/api/github-pr-stats?username=torvalds&theme=light&limit=5
+https://pullscape.fly.dev/api/github-pr-stats?username=torvalds&status=merged&sort=stars_desc&limit=10
+https://pullscape.fly.dev/api/github-pr-stats?username=torvalds&mode=repo-aggregate&sort=merged_rate_desc
+https://pullscape.fly.dev/api/github-pr-stats?username=torvalds&fields=repo,stars,status&stats=total_pr,merged_pr
+```
+
+To embed in a GitHub README:
+
+```md
+![Pull Request Activity](https://pullscape.fly.dev/api/github-pr-stats?username=torvalds&theme=dark&limit=10)
 ```
 
 ## Running locally
@@ -71,7 +77,7 @@ The server starts on port 8080 by default. Set `PORT` in `.env` to change it.
 The repo includes a `Dockerfile` and `fly.toml` for deploying to fly.io.
 
 ```sh
-fly launch
+fly apps create pullscape
 fly secrets set GITHUB_TOKEN=your_token_here
 fly deploy
 ```

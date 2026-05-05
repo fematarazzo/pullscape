@@ -54,7 +54,6 @@ Repo aggregate: `repo`, `stars`, `pr_numbers`, `total`, `merged`, `open`, `draft
 ```sh
 cp .env.example .env
 # add your GitHub token to .env
-set -a && source .env && set +a
 go run .
 ```
 

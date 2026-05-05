@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"html"
 	"log"
 	"net/http"
 	"os"
@@ -72,7 +73,7 @@ func svgError(w http.ResponseWriter, msg string, notFound bool) {
 	}
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.WriteHeader(status)
-	fmt.Fprintf(w, `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="60"><rect width="400" height="60" fill="#0d1117" rx="6"/><text x="20" y="35" font-family="monospace" font-size="13" fill="#e6edf3">Error: %s</text></svg>`, msg)
+	fmt.Fprintf(w, `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="60"><rect width="400" height="60" fill="#0d1117" rx="6"/><text x="20" y="35" font-family="monospace" font-size="13" fill="#e6edf3">Error: %s</text></svg>`, html.EscapeString(msg))
 }
 
 func parseInt(s string) int {

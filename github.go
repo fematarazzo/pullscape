@@ -98,6 +98,13 @@ func fetchAllPRs(token, username string) ([]rawPR, error) {
 	return all, nil
 }
 
+func firstN(b []byte, n int) string {
+	if len(b) <= n {
+		return string(b)
+	}
+	return string(b[:n]) + "..."
+}
+
 func fetchPage(token, username string, after *string) ([]rawPR, bool, *string, error) {
 	body := map[string]any{
 		"query": prQuery,
@@ -124,7 +131,7 @@ func fetchPage(token, username string, after *string) ([]rawPR, bool, *string, e
 
 	var result gqlResponse
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, false, nil, err
+		return nil, false, nil, fmt.Errorf("github returned HTTP %d with non-JSON body: %s", resp.StatusCode, firstN(data, 120))
 	}
 
 	if len(result.Errors) > 0 {

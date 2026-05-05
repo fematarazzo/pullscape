@@ -45,7 +45,7 @@ type col struct {
 
 var prListCols = []col{
 	{"repo", "Repository", 200, "left"},
-	{"stars", "Stars", 80, "right"},
+	{"stars", "Stars", 80, "center"},
 	{"pr_title", "PR Title", 250, "left"},
 	{"pr_number", "PR #", 60, "center"},
 	{"status", "Status", 80, "center"},
@@ -55,7 +55,7 @@ var prListCols = []col{
 
 var repoCols = []col{
 	{"repo", "Repository", 200, "left"},
-	{"stars", "Stars", 80, "right"},
+	{"stars", "Stars", 80, "center"},
 	{"pr_numbers", "PRs", 150, "left"},
 	{"total", "Total", 60, "center"},
 	{"merged", "Merged", 60, "center"},
@@ -82,7 +82,7 @@ var statusIcons = map[string]string{
 const (
 	rowH    = 35
 	headerH = 40
-	titleH  = 50
+	titleH  = 44
 	pad     = 10
 )
 
@@ -165,12 +165,12 @@ func prListView(username string, prs []PR, stats Stats, params Params, t theme) 
 		statsMargin = 10
 	}
 
-	totalH := titleH + statsH + statsMargin + headerH + len(prs)*rowH + 20
+	totalH := titleH + statsH + statsMargin + headerH + len(prs)*rowH + 8
 
 	var b bytes.Buffer
 	svgOpen(&b, effectiveW, totalH, t.bg)
 
-	y := 20
+	y := 8
 	writeTitle(&b, username, effectiveW, y, t)
 	y += titleH
 
@@ -203,12 +203,12 @@ func repoView(username string, repos []RepoAggregate, stats Stats, params Params
 		statsMargin = 10
 	}
 
-	totalH := titleH + statsH + statsMargin + headerH + len(repos)*rowH + 20
+	totalH := titleH + statsH + statsMargin + headerH + len(repos)*rowH + 8
 
 	var b bytes.Buffer
 	svgOpen(&b, effectiveW, totalH, t.bg)
 
-	y := 20
+	y := 8
 	writeTitle(&b, username, effectiveW, y, t)
 	y += titleH
 
@@ -248,8 +248,8 @@ func svgOpen(b *bytes.Buffer, w, h int, bg string) {
 }
 
 func writeTitle(b *bytes.Buffer, username string, w, y int, t theme) {
-	fmt.Fprintf(b, `<text x="%d" y="%d" text-anchor="middle" font-size="15" font-weight="600" fill="%s">%s's PR Stats</text>`,
-		w/2, y+25, t.titleColor, html.EscapeString(username))
+	fmt.Fprintf(b, `<text x="%d" y="%d" text-anchor="middle" style="font-size:24px;font-weight:600" fill="%s">Pull Request Activity · %s</text>`,
+		w/2, y+26, t.titleColor, html.EscapeString(username))
 }
 
 func writeStats(b *bytes.Buffer, items []statItem, w, y int, t theme) {
@@ -368,10 +368,18 @@ func writeIcon(b *bytes.Buffer, status string, x, y int) {
 		x, y, statusColors[status], path)
 }
 
+func formatStars(n int) string {
+	s := strconv.Itoa(n)
+	for i := len(s) - 3; i > 0; i -= 3 {
+		s = s[:i] + "," + s[i:]
+	}
+	return s + " ⭐"
+}
+
 func prCell(pr PR, key string) string {
 	switch key {
 	case "stars":
-		return strconv.Itoa(pr.Stars)
+		return formatStars(pr.Stars)
 	case "pr_number":
 		return "#" + strconv.Itoa(pr.Number)
 	case "created_date":
@@ -387,7 +395,7 @@ func repoCell(r RepoAggregate, key string) string {
 	case "repo":
 		return r.Repo
 	case "stars":
-		return strconv.Itoa(r.Stars)
+		return formatStars(r.Stars)
 	case "pr_numbers":
 		nums := make([]string, len(r.PRNumbers))
 		for i, n := range r.PRNumbers {

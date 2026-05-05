@@ -92,13 +92,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, svg)
 }
 
-func svgError(w http.ResponseWriter, msg string, notFound bool) {
-	status := http.StatusInternalServerError
-	if notFound {
-		status = http.StatusNotFound
-	}
+func svgError(w http.ResponseWriter, msg string, _ bool) {
 	w.Header().Set("Content-Type", "image/svg+xml")
-	w.WriteHeader(status)
+	w.Header().Set("Cache-Control", "no-store")
 	fmt.Fprintf(w, `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="60"><rect width="400" height="60" fill="#0d1117" rx="6"/><text x="20" y="35" font-family="monospace" font-size="13" fill="#e6edf3">Error: %s</text></svg>`, html.EscapeString(msg))
 }
 

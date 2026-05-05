@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
+
+var githubClient = &http.Client{Timeout: 10 * time.Second}
 
 const githubGraphQL = "https://api.github.com/graphql"
 
@@ -121,7 +124,7 @@ func fetchPage(token, username string, after *string) ([]rawPR, bool, *string, e
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "pullscape")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := githubClient.Do(req)
 	if err != nil {
 		return nil, false, nil, err
 	}

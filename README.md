@@ -10,6 +10,34 @@ Generates SVG cards showing a GitHub user's pull request history. Embed them in 
 GET https://pullscape.fly.dev/api/github-pr-stats?username=<github_username>
 ```
 
+## Preview
+
+### PR list — dark theme
+
+![Dark theme](docs/example-dark.svg)
+
+```
+?username=fematarazzo&theme=dark&min_stars=50&sort=stars_desc&limit=10
+```
+
+### PR list — light theme
+
+![Light theme](docs/example-light.svg)
+
+```
+?username=fematarazzo&theme=light&min_stars=50&sort=stars_desc&limit=10
+```
+
+### Repo aggregate mode
+
+![Repo aggregate](docs/example-aggregate.svg)
+
+```
+?username=fematarazzo&theme=dark&mode=repo-aggregate&sort=merged_rate_desc&min_stars=50
+```
+
+---
+
 ## Parameters
 
 | Parameter  | Default            | Description                                                                 |

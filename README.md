@@ -67,17 +67,36 @@ The server starts on port 8080 by default. Set `PORT` in `.env` to change it.
 
 ## Environment variables
 
-| Variable       | Description                                                  |
-|----------------|--------------------------------------------------------------|
-| `GITHUB_TOKEN` | GitHub personal access token. Needs `read:user` scope.      |
-| `PORT`         | Port to listen on. Defaults to `8080`.                       |
+| Variable                    | Required | Description                                                        |
+|-----------------------------|----------|--------------------------------------------------------------------|
+| `GITHUB_TOKEN`              | yes      | GitHub personal access token. Needs `read:user` scope.            |
+| `PORT`                      | no       | Port to listen on. Defaults to `8080`.                             |
+| `UPSTASH_REDIS_REST_URL`    | no       | Upstash Redis REST endpoint. Enables persistent cache across restarts. |
+| `UPSTASH_REDIS_REST_TOKEN`  | no       | Upstash Redis REST token.                                          |
+
+Without Redis the server falls back to an in-memory cache (wiped on restart).
+
+## Caching
+
+Responses are cached for 1 hour. Cache lookup order:
+
+1. In-memory (`sync.Map`) — fastest, per-process
+2. Redis — survives restarts; first request after a cold start still returns instantly
+3. GitHub API — only on a full cache miss
 
 ## Deployment
 
-The repo includes a `Dockerfile` and `fly.toml` for deploying to fly.io.
+The repo includes a `Dockerfile` and `fly.toml` for deploying to Fly.io.
 
 ```sh
 fly apps create pullscape
 fly secrets set GITHUB_TOKEN=your_token_here
 fly deploy
+```
+
+To add persistent Redis cache (recommended):
+
+```sh
+fly redis create
+fly secrets set UPSTASH_REDIS_REST_URL=https://... UPSTASH_REDIS_REST_TOKEN=...
 ```

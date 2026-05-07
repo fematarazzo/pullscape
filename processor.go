@@ -57,7 +57,7 @@ func processPRs(raw []rawPR) []PR {
 		mergedDate := ""
 		if r.MergedAt != nil {
 			mergedDate = formatDate(*r.MergedAt)
-		} else if status == "merged" && r.ClosedAt != nil {
+		} else if (status == "merged" || status == "upstream") && r.ClosedAt != nil {
 			mergedDate = formatDate(*r.ClosedAt)
 		}
 		prs = append(prs, PR{
@@ -84,22 +84,29 @@ func prStatus(r rawPR) string {
 	if r.State == "OPEN" {
 		return "open"
 	}
-	if r.State == "CLOSED" && closedByCommit(r) {
-		return "merged"
+	if r.State == "CLOSED" {
+		switch closerType(r) {
+		case "Commit":
+			return "merged"
+		case "PullRequest":
+			return "upstream"
+		}
 	}
 	return "closed"
 }
 
-func closedByCommit(r rawPR) bool {
+func closerType(r rawPR) string {
 	if len(r.TimelineItems.Nodes) == 0 {
-		return false
+		return ""
 	}
 	closer := r.TimelineItems.Nodes[0].Closer
 	if closer == nil {
-		return false
+		return ""
 	}
-	return closer.Typename == "Commit" ||
-		(closer.Typename == "PullRequest" && closer.State == "MERGED")
+	if closer.Typename == "PullRequest" && closer.State != "MERGED" {
+		return ""
+	}
+	return closer.Typename
 }
 
 func formatDate(s string) string {
@@ -179,14 +186,16 @@ func statusPriority(s string) int {
 	switch s {
 	case "merged":
 		return 0
-	case "open":
+	case "upstream":
 		return 1
-	case "draft":
+	case "open":
 		return 2
-	case "closed":
+	case "draft":
 		return 3
+	case "closed":
+		return 4
 	}
-	return 4
+	return 5
 }
 
 func calcStats(all, display []PR) Stats {
@@ -195,7 +204,7 @@ func calcStats(all, display []PR) Stats {
 	merged := 0
 	for _, pr := range all {
 		reposWithPR[pr.Repo] = true
-		if pr.Status == "merged" {
+		if pr.Status == "merged" || pr.Status == "upstream" {
 			merged++
 			reposWithMerged[pr.Repo] = true
 		}
@@ -227,7 +236,7 @@ func aggregateByRepo(prs []PR) []RepoAggregate {
 		r.PRNumbers = append(r.PRNumbers, pr.Number)
 		r.Total++
 		switch pr.Status {
-		case "merged":
+		case "merged", "upstream":
 			r.Merged++
 		case "open":
 			r.Open++

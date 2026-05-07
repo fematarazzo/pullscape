@@ -17,7 +17,7 @@ GET https://pullscape.fly.dev/api/github-pr-stats?username=<github_username>
 | `username` | required           | GitHub username                                                             |
 | `theme`    | `dark`             | `dark` or `light`                                                           |
 | `mode`     | PR list            | `repo-aggregate` to group by repository instead of listing individual PRs  |
-| `status`   | `all`              | Filter by status: `merged`, `open`, `draft`, `closed`, or comma-separated  |
+| `status`   | `all`              | Filter by status: `merged`, `upstream`, `open`, `draft`, `closed`, or comma-separated  |
 | `min_stars`| `0`                | Only include PRs from repos with at least this many stars                   |
 | `limit`    | `10`               | Max rows to show                                                            |
 | `sort`     | `status,stars_desc`| Sort fields, comma-separated (see below)                                    |

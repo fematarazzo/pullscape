@@ -95,7 +95,11 @@ func closedByCommit(r rawPR) bool {
 		return false
 	}
 	closer := r.TimelineItems.Nodes[0].Closer
-	return closer != nil && closer.Typename == "Commit"
+	if closer == nil {
+		return false
+	}
+	return closer.Typename == "Commit" ||
+		(closer.Typename == "PullRequest" && closer.State == "MERGED")
 }
 
 func formatDate(s string) string {

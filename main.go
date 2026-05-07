@@ -22,10 +22,13 @@ type cacheEntry struct {
 var (
 	svgCache sync.Map
 	cacheTTL = 1 * time.Hour
+	redis    *redisClient
 )
 
 func main() {
 	_ = godotenv.Load()
+
+	redis = newRedisClient()
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -64,13 +67,18 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cacheKey := r.URL.RawQuery
+
 	if v, ok := svgCache.Load(cacheKey); ok {
-		entry := v.(cacheEntry)
-		if time.Since(entry.at) < cacheTTL {
-			w.Header().Set("Content-Type", "image/svg+xml")
-			w.Header().Set("Cache-Control", "public, max-age=3600")
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			fmt.Fprint(w, entry.svg)
+		if entry := v.(cacheEntry); time.Since(entry.at) < cacheTTL {
+			writeSVG(w, entry.svg)
+			return
+		}
+	}
+
+	if redis != nil {
+		if svg, ok := redis.get(cacheKey); ok {
+			svgCache.Store(cacheKey, cacheEntry{svg: svg, at: time.Now()})
+			writeSVG(w, svg)
 			return
 		}
 	}
@@ -85,7 +93,14 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	svg := generateSVG(username, prs, stats, params, repos)
 
 	svgCache.Store(cacheKey, cacheEntry{svg: svg, at: time.Now()})
+	if redis != nil {
+		go redis.set(cacheKey, svg, cacheTTL)
+	}
 
+	writeSVG(w, svg)
+}
+
+func writeSVG(w http.ResponseWriter, svg string) {
 	w.Header().Set("Content-Type", "image/svg+xml")
 	w.Header().Set("Cache-Control", "public, max-age=3600")
 	w.Header().Set("Access-Control-Allow-Origin", "*")

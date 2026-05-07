@@ -30,7 +30,10 @@ query GetUserPRs($username: String!, $first: Int!, $after: String) {
         timelineItems(itemTypes: [CLOSED_EVENT], last: 1) {
           nodes {
             ... on ClosedEvent {
-              closer { __typename }
+              closer {
+                __typename
+                ... on PullRequest { state }
+              }
             }
           }
         }
@@ -60,6 +63,7 @@ type rawPR struct {
 		Nodes []struct {
 			Closer *struct {
 				Typename string `json:"__typename"`
+				State    string `json:"state"`
 			} `json:"closer"`
 		} `json:"nodes"`
 	} `json:"timelineItems"`

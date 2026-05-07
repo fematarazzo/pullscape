@@ -24,6 +24,18 @@ GET https://pullscape.fly.dev/api/github-pr-stats?username=<github_username>
 | `fields`   | all columns        | Columns to include, comma-separated (see below)                             |
 | `stats`    | `all`              | Which summary stats to show in the header bar                               |
 
+### Status values
+
+| Status | Meaning |
+|--------|---------|
+| `merged` | PR was directly merged on GitHub, or closed by a cherry-picked commit |
+| `upstream` | PR was closed because a maintainer pulled the changes into their own PR or via an external tool (Gerrit, Phabricator) — contribution accepted but not directly merged |
+| `open` | Still open |
+| `draft` | Open as a draft |
+| `closed` | Closed without the changes being accepted |
+
+Both `merged` and `upstream` count toward the merged tally and merge rate.
+
 ### Sort options
 
 PR list mode: `stars_desc`, `stars_asc`, `created_date_desc`, `created_date_asc`, `status`

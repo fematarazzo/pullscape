@@ -37,6 +37,12 @@ query GetUserPRs($username: String!, $first: Int!, $after: String) {
             }
           }
         }
+        comments(last: 1) {
+          nodes {
+            author { login }
+            bodyText
+          }
+        }
       }
     }
   }
@@ -67,6 +73,12 @@ type rawPR struct {
 			} `json:"closer"`
 		} `json:"nodes"`
 	} `json:"timelineItems"`
+	Comments struct {
+		Nodes []struct {
+			Author   struct{ Login string } `json:"author"`
+			BodyText string                 `json:"bodyText"`
+		} `json:"nodes"`
+	} `json:"comments"`
 }
 
 type gqlResponse struct {

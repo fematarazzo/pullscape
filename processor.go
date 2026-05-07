@@ -96,17 +96,36 @@ func prStatus(r rawPR) string {
 }
 
 func closerType(r rawPR) string {
-	if len(r.TimelineItems.Nodes) == 0 {
-		return ""
+	if len(r.TimelineItems.Nodes) > 0 {
+		closer := r.TimelineItems.Nodes[0].Closer
+		if closer != nil {
+			if closer.Typename == "Commit" {
+				return "Commit"
+			}
+			if closer.Typename == "PullRequest" && closer.State == "MERGED" {
+				return "PullRequest"
+			}
+		}
 	}
-	closer := r.TimelineItems.Nodes[0].Closer
-	if closer == nil {
-		return ""
+	if mergedExternallyByBot(r) {
+		return "PullRequest"
 	}
-	if closer.Typename == "PullRequest" && closer.State != "MERGED" {
-		return ""
+	return ""
+}
+
+// mergedExternallyByBot detects projects (Go, FreeBSD, etc.) that merge patches
+// via external tools (Gerrit, Phabricator) and have a bot close the GitHub PR
+// with a comment confirming the merge.
+func mergedExternallyByBot(r rawPR) bool {
+	if len(r.Comments.Nodes) == 0 {
+		return false
 	}
-	return closer.Typename
+	c := r.Comments.Nodes[0]
+	login := strings.ToLower(c.Author.Login)
+	body := strings.ToLower(c.BodyText)
+	isBot := strings.HasSuffix(login, "[bot]") || login == "gopherbot" || login == "bors"
+	hasMergeMsg := strings.Contains(body, "has been merged") || strings.Contains(body, "is being closed because")
+	return isBot && hasMergeMsg
 }
 
 func formatDate(s string) string {

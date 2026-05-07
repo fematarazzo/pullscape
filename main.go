@@ -44,6 +44,8 @@ func main() {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+
 	token := os.Getenv("GITHUB_TOKEN")
 	if token == "" {
 		http.Error(w, "GITHUB_TOKEN not set", http.StatusInternalServerError)
@@ -73,6 +75,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	if v, ok := svgCache.Load(cacheKey); ok {
 		if entry := v.(cacheEntry); time.Since(entry.at) < cacheTTL {
+			log.Printf("status:200 source:memory user:%s time:%.3fs", username, time.Since(start).Seconds())
 			writeSVG(w, entry.svg)
 			return
 		}
@@ -81,6 +84,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	if redis != nil {
 		if svg, ok := redis.get(cacheKey); ok {
 			svgCache.Store(cacheKey, cacheEntry{svg: svg, at: time.Now()})
+			log.Printf("status:200 source:redis user:%s time:%.3fs", username, time.Since(start).Seconds())
 			writeSVG(w, svg)
 			return
 		}
@@ -88,6 +92,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 	raw, err := fetchAllPRs(token, username)
 	if err != nil {
+		log.Printf("status:500 source:github user:%s time:%.3fs err:%s", username, time.Since(start).Seconds(), err)
 		svgError(w, err.Error(), strings.Contains(err.Error(), "not found"))
 		return
 	}
@@ -100,12 +105,13 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		go redis.set(cacheKey, svg, cacheTTL)
 	}
 
+	log.Printf("status:200 source:github user:%s time:%.3fs", username, time.Since(start).Seconds())
 	writeSVG(w, svg)
 }
 
 func writeSVG(w http.ResponseWriter, svg string) {
 	w.Header().Set("Content-Type", "image/svg+xml")
-	w.Header().Set("Cache-Control", "public, max-age=3600")
+	w.Header().Set("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	fmt.Fprint(w, svg)
 }

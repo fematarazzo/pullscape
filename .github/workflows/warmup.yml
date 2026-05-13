@@ -12,5 +12,5 @@ jobs:
       - name: ping pullscape
         run: |
           curl -sf --max-time 30 \
-            "https://pullscape.fly.dev/api/github-pr-stats?username=fematarazzo" \
+            "https://pullscape.fly.dev/api/github-pr-stats?username=fematarazzo&theme=dark&min_stars=500&limit=10" \
             -o /dev/null

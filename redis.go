@@ -26,7 +26,7 @@ func newRedisClient() *redisClient {
 	return &redisClient{
 		url:   url,
 		token: token,
-		http:  &http.Client{Timeout: 2 * time.Second},
+		http:  &http.Client{Timeout: 5 * time.Second},
 	}
 }
 
@@ -35,7 +35,10 @@ func (c *redisClient) ping() error {
 	req, _ := http.NewRequest("POST", c.url, bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.http.Do(req)
+	// First call to a Fly-managed Upstash over 6PN can be slow when the
+	// endpoint is idle; give the startup ping its own generous timeout.
+	pinger := &http.Client{Timeout: 15 * time.Second}
+	resp, err := pinger.Do(req)
 	if err != nil {
 		return err
 	}

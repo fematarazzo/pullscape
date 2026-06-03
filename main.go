@@ -5,6 +5,7 @@ import (
 	"html"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -20,15 +21,27 @@ type cacheEntry struct {
 }
 
 var (
-	svgCache sync.Map
-	cacheTTL = 1 * time.Hour
-	redis    *redisClient
+	svgCache   sync.Map
+	cacheTTL   = 12 * time.Hour
+	redisTTL   = 7 * 24 * time.Hour
+	redis      *redisClient
+	refreshing sync.Map
 )
 
 func main() {
 	_ = godotenv.Load()
 
 	redis = newRedisClient()
+	if redis != nil {
+		if err := redis.ping(); err != nil {
+			log.Printf("redis: configured but ping failed: %v — disabling", err)
+			redis = nil
+		} else {
+			log.Printf("redis: connected")
+		}
+	} else {
+		log.Printf("redis: not configured (memory-only cache)")
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -59,8 +72,84 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	params := Params{
-		Username: username,
+	params := buildParams(q)
+	cacheKey := r.URL.RawQuery
+
+	// Memory: never expire entries. Serve immediately; refresh in background
+	// when older than cacheTTL. Keeps response sub-ms so GitHub Camo's ~10s
+	// fetch timeout is never an issue, even when the upstream GitHub GraphQL
+	// query is slow.
+	if v, ok := svgCache.Load(cacheKey); ok {
+		entry := v.(cacheEntry)
+		age := time.Since(entry.at)
+		source := "memory"
+		if age >= cacheTTL {
+			source = "memory-stale"
+			go refresh(token, cacheKey, params)
+		}
+		log.Printf("status:200 source:%s user:%s age:%s time:%.3fs", source, username, age.Round(time.Second), time.Since(start).Seconds())
+		writeSVG(w, entry.svg)
+		return
+	}
+
+	// Redis: rehydrate after a machine restart wipes memory.
+	if redis != nil {
+		if svg, ok := redis.get(cacheKey); ok {
+			svgCache.Store(cacheKey, cacheEntry{svg: svg, at: time.Now()})
+			log.Printf("status:200 source:redis user:%s time:%.3fs", username, time.Since(start).Seconds())
+			writeSVG(w, svg)
+			go refresh(token, cacheKey, params)
+			return
+		}
+	}
+
+	// GitHub: only on a true cold miss (new query string).
+	svg, err := fetchAndRender(token, username, params)
+	if err != nil {
+		log.Printf("status:500 source:github user:%s time:%.3fs err:%s", username, time.Since(start).Seconds(), err)
+		svgError(w, err.Error(), strings.Contains(err.Error(), "not found"))
+		return
+	}
+
+	store(cacheKey, svg)
+	log.Printf("status:200 source:github user:%s time:%.3fs", username, time.Since(start).Seconds())
+	writeSVG(w, svg)
+}
+
+func refresh(token, cacheKey string, params Params) {
+	if _, busy := refreshing.LoadOrStore(cacheKey, true); busy {
+		return
+	}
+	defer refreshing.Delete(cacheKey)
+
+	svg, err := fetchAndRender(token, params.Username, params)
+	if err != nil {
+		log.Printf("refresh failed user:%s err:%s", params.Username, err)
+		return
+	}
+	store(cacheKey, svg)
+	log.Printf("refresh ok user:%s", params.Username)
+}
+
+func store(cacheKey, svg string) {
+	svgCache.Store(cacheKey, cacheEntry{svg: svg, at: time.Now()})
+	if redis != nil {
+		go redis.set(cacheKey, svg, redisTTL)
+	}
+}
+
+func fetchAndRender(token, username string, params Params) (string, error) {
+	raw, err := fetchAllPRs(token, username)
+	if err != nil {
+		return "", err
+	}
+	prs, stats, repos := processData(raw, params)
+	return generateSVG(username, prs, stats, params, repos), nil
+}
+
+func buildParams(q url.Values) Params {
+	return Params{
+		Username: q.Get("username"),
 		Theme:    orDefault(q.Get("theme"), "dark"),
 		Status:   q.Get("status"),
 		MinStars: parseInt(q.Get("min_stars")),
@@ -70,48 +159,11 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		Fields:   q.Get("fields"),
 		Mode:     q.Get("mode"),
 	}
-
-	cacheKey := r.URL.RawQuery
-
-	if v, ok := svgCache.Load(cacheKey); ok {
-		if entry := v.(cacheEntry); time.Since(entry.at) < cacheTTL {
-			log.Printf("status:200 source:memory user:%s time:%.3fs", username, time.Since(start).Seconds())
-			writeSVG(w, entry.svg)
-			return
-		}
-	}
-
-	if redis != nil {
-		if svg, ok := redis.get(cacheKey); ok {
-			svgCache.Store(cacheKey, cacheEntry{svg: svg, at: time.Now()})
-			log.Printf("status:200 source:redis user:%s time:%.3fs", username, time.Since(start).Seconds())
-			writeSVG(w, svg)
-			return
-		}
-	}
-
-	raw, err := fetchAllPRs(token, username)
-	if err != nil {
-		log.Printf("status:500 source:github user:%s time:%.3fs err:%s", username, time.Since(start).Seconds(), err)
-		svgError(w, err.Error(), strings.Contains(err.Error(), "not found"))
-		return
-	}
-
-	prs, stats, repos := processData(raw, params)
-	svg := generateSVG(username, prs, stats, params, repos)
-
-	svgCache.Store(cacheKey, cacheEntry{svg: svg, at: time.Now()})
-	if redis != nil {
-		go redis.set(cacheKey, svg, cacheTTL)
-	}
-
-	log.Printf("status:200 source:github user:%s time:%.3fs", username, time.Since(start).Seconds())
-	writeSVG(w, svg)
 }
 
 func writeSVG(w http.ResponseWriter, svg string) {
 	w.Header().Set("Content-Type", "image/svg+xml")
-	w.Header().Set("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400")
+	w.Header().Set("Cache-Control", "public, max-age=86400, stale-while-revalidate=2592000")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	fmt.Fprint(w, svg)
 }

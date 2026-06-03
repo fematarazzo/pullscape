@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -28,6 +30,23 @@ func newRedisClient() *redisClient {
 	}
 }
 
+func (c *redisClient) ping() error {
+	body, _ := json.Marshal([]string{"PING"})
+	req, _ := http.NewRequest("POST", c.url, bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	data, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("status %d: %s", resp.StatusCode, firstN(data, 200))
+	}
+	return nil
+}
+
 func (c *redisClient) get(key string) (string, bool) {
 	body, _ := json.Marshal([]string{"GET", key})
 	req, _ := http.NewRequest("POST", c.url, bytes.NewReader(body))
@@ -35,10 +54,15 @@ func (c *redisClient) get(key string) (string, bool) {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.http.Do(req)
 	if err != nil {
+		log.Printf("redis get failed: %v", err)
 		return "", false
 	}
 	defer resp.Body.Close()
 	data, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		log.Printf("redis get: status %d body:%s", resp.StatusCode, firstN(data, 200))
+		return "", false
+	}
 	var result struct {
 		Result *string `json:"result"`
 	}
@@ -55,7 +79,12 @@ func (c *redisClient) set(key, value string, ttl time.Duration) {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.http.Do(req)
 	if err != nil {
+		log.Printf("redis set failed: %v", err)
 		return
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		data, _ := io.ReadAll(resp.Body)
+		log.Printf("redis set: status %d body:%s", resp.StatusCode, firstN(data, 200))
+	}
 }
